@@ -44,13 +44,20 @@ export default function CampaignsPage() {
   };
 
   const handleResendCampaign = async (id) => {
-    if (confirm('Resend this campaign to all recipients? This will send again even if they already received it.')) {
+    if (confirm('Resend this campaign to all recipients?')) {
       try {
-        await api.post(`/campaigns/${id}/send`);
-        toast.success('Resend started. Check status shortly.');
+        // Au lieu de api.post(`/campaigns/${id}/send`)
+        const response = await fetch('/api/proxy-send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ campaignId: id }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message);
+        toast.success('Resend started.');
         fetchCampaigns();
       } catch (error) {
-        toast.error(error.response?.data?.message || 'Failed to resend campaign');
+        toast.error(error.message || 'Failed to resend');
       }
     }
   };
