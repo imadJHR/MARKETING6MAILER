@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,8 @@ import { toast } from 'sonner';
 import { Save, Send, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
-export default function NewCampaignPage() {
+// Inner component that uses useSearchParams
+function NewCampaignForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [clients, setClients] = useState([]);
@@ -47,7 +48,6 @@ export default function NewCampaignPage() {
       const response = await api.get('/templates');
       setTemplates(response.data.data || []);
       
-      // Check URL for template parameter
       const templateId = searchParams.get('template');
       if (templateId) {
         setSelectedTemplateId(templateId);
@@ -97,7 +97,6 @@ export default function NewCampaignPage() {
     setLoading(true);
     
     try {
-      // Create campaign
       const campaignData = {
         name: formData.name,
         subject: formData.subject,
@@ -109,7 +108,6 @@ export default function NewCampaignPage() {
       const campaignId = campaignRes.data.data._id;
       
       if (shouldSend) {
-        // Send campaign immediately
         await api.post(`/campaigns/${campaignId}/send`);
         toast.success('Campaign created and sent successfully!');
       } else {
@@ -308,5 +306,18 @@ export default function NewCampaignPage() {
         </form>
       </main>
     </div>
+  );
+}
+
+// Default export with Suspense wrapper
+export default function NewCampaignPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">Loading...</div>
+      </div>
+    }>
+      <NewCampaignForm />
+    </Suspense>
   );
 }
