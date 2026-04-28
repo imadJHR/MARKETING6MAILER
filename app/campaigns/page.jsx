@@ -14,10 +14,7 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchCampaigns();
-  }, []);
-
+  // ✅ Définir fetchCampaigns AVANT useEffect
   const fetchCampaigns = async () => {
     try {
       const response = await api.get('/campaigns');
@@ -29,14 +26,31 @@ export default function CampaignsPage() {
     }
   };
 
+  // ✅ Maintenant useEffect peut appeler fetchCampaigns
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+
   const handleDeleteCampaign = async (id) => {
     if (confirm('Are you sure you want to delete this campaign?')) {
       try {
         await api.delete(`/campaigns/${id}`);
         toast.success('Campaign deleted successfully');
-        fetchCampaigns();
+        fetchCampaigns(); // recharger après suppression
       } catch (error) {
         toast.error('Failed to delete campaign');
+      }
+    }
+  };
+
+  const handleResendCampaign = async (id) => {
+    if (confirm('Resend this campaign to all recipients? This will send again even if they already received it.')) {
+      try {
+        await api.post(`/campaigns/${id}/send`);
+        toast.success('Resend started. Check status shortly.');
+        fetchCampaigns();
+      } catch (error) {
+        toast.error(error.response?.data?.message || 'Failed to resend campaign');
       }
     }
   };
@@ -49,6 +63,8 @@ export default function CampaignsPage() {
         return <Badge className="bg-yellow-500">Sending</Badge>;
       case 'failed':
         return <Badge className="bg-red-500">Failed</Badge>;
+      case 'partial':
+        return <Badge className="bg-orange-500">Partial</Badge>;
       default:
         return <Badge variant="outline">Draft</Badge>;
     }
@@ -133,6 +149,17 @@ export default function CampaignsPage() {
                               View Stats
                             </Button>
                           </Link>
+                          {campaign.status !== 'sent' && campaign.status !== 'sending' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleResendCampaign(campaign._id)}
+                              className="gap-1"
+                            >
+                              <Send className="h-3 w-3" />
+                              Resend
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
