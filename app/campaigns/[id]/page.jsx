@@ -52,10 +52,7 @@ export default function CampaignDetailsPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchCampaignDetails();
-  }, [params.id]);
-
+  // Déplacer la fonction AVANT useEffect
   const fetchCampaignDetails = async () => {
     try {
       const [campaignRes, statsRes] = await Promise.all([
@@ -71,6 +68,10 @@ export default function CampaignDetailsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchCampaignDetails();
+  }, [params.id]);
 
   if (loading) {
     return (
@@ -95,10 +96,10 @@ export default function CampaignDetailsPage() {
 
   const urlData = stats?.clicks?.byUrl
     ? Object.entries(stats.clicks.byUrl).map(([url, count]) => ({
-        url: url.length > 50 ? url.substring(0, 50) + '...' : url,
-        fullUrl: url,
-        clicks: count,
-      }))
+      url: url.length > 50 ? url.substring(0, 50) + '...' : url,
+      fullUrl: url,
+      clicks: count,
+    }))
     : [];
 
   return (
@@ -119,8 +120,8 @@ export default function CampaignDetailsPage() {
                   campaign.status === 'sent'
                     ? 'default'
                     : campaign.status === 'sending'
-                    ? 'secondary'
-                    : 'outline'
+                      ? 'secondary'
+                      : 'outline'
                 }
               >
                 {campaign.status}
