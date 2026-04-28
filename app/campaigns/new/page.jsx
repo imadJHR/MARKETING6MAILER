@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,18 @@ import { toast } from 'sonner';
 import { Save, Send, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
+// Loading fallback while suspense loads
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+        <p>Loading campaign form...</p>
+      </div>
+    </div>
+  );
+}
+
 // Inner component that uses useSearchParams
 function NewCampaignForm() {
   const router = useRouter();
@@ -22,6 +34,7 @@ function NewCampaignForm() {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [initialFetchDone, setInitialFetchDone] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     subject: '',
@@ -29,43 +42,43 @@ function NewCampaignForm() {
     recipients: [],
   });
 
+  // Fetch initial data on mount
   useEffect(() => {
-    fetchClients();
-    fetchTemplates();
-  }, []);
-
-  const fetchClients = async () => {
-    try {
-      const response = await api.get('/clients');
-      setClients(response.data.data || []);
-    } catch (error) {
-      toast.error('Failed to fetch clients');
-    }
-  };
-
-  const fetchTemplates = async () => {
-    try {
-      const response = await api.get('/templates');
-      setTemplates(response.data.data || []);
-      
-      const templateId = searchParams.get('template');
-      if (templateId) {
-        setSelectedTemplateId(templateId);
-        const template = response.data.data.find(t => t._id === templateId);
-        if (template) {
-          setFormData(prev => ({
-            ...prev,
-            name: template.name,
-            subject: template.subject,
-            htmlContent: template.htmlContent
-          }));
-          toast.info(`Loaded template: ${template.name}`);
+    const fetchInitialData = async () => {
+      try {
+        const [clientsRes, templatesRes] = await Promise.all([
+          api.get('/clients'),
+          api.get('/templates').catch(() => ({ data: { data: [] } }))
+        ]);
+        
+        setClients(clientsRes.data.data || []);
+        setTemplates(templatesRes.data.data || []);
+        
+        // Check for templateId in URL
+        const templateId = searchParams.get('template');
+        if (templateId && templatesRes.data.data) {
+          const template = templatesRes.data.data.find(t => t._id === templateId);
+          if (template) {
+            setSelectedTemplateId(templateId);
+            setFormData(prev => ({
+              ...prev,
+              name: template.name,
+              subject: template.subject,
+              htmlContent: template.htmlContent
+            }));
+            toast.info(`Loaded template: ${template.name}`);
+          }
         }
+      } catch (error) {
+        console.error('Failed to fetch initial data:', error);
+        toast.error('Failed to load clients or templates. Please refresh the page.');
+      } finally {
+        setInitialFetchDone(true);
       }
-    } catch (error) {
-      console.error('Failed to fetch templates', error);
-    }
-  };
+    };
+    
+    fetchInitialData();
+  }, [searchParams]);
 
   const handleTemplateSelect = (templateId) => {
     setSelectedTemplateId(templateId);
@@ -116,7 +129,9 @@ function NewCampaignForm() {
       
       router.push('/campaigns');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to create campaign');
+      console.error('Submit error:', error);
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to create campaign';
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -132,12 +147,24 @@ function NewCampaignForm() {
   };
 
   const toggleAllRecipients = () => {
-    if (formData.recipients.length === clients.length) {
+    if (formData.recipients.length === clients.length && clients.length > 0) {
       setFormData(prev => ({ ...prev, recipients: [] }));
     } else {
       setFormData(prev => ({ ...prev, recipients: clients.map(c => c._id) }));
     }
   };
+
+  // Show loading indicator until initial fetch completes
+  if (!initialFetchDone) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p>Loading data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -309,14 +336,10 @@ function NewCampaignForm() {
   );
 }
 
-// Default export with Suspense wrapper
+// Default export with Suspense boundary
 export default function NewCampaignPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">Loading....</div>
-      </div>
-    }>
+    <Suspense fallback={<LoadingFallback />}>
       <NewCampaignForm />
     </Suspense>
   );
